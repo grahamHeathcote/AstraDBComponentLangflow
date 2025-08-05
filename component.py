@@ -29,7 +29,7 @@ from langflow.utils.version import get_version_info
 
 @vector_store_connection
 class AstraDBVectorStoreComponent(LCVectorStoreComponent):
-    display_name: str = "Astra DB Graham Version 1.0"
+    display_name: str = "Astra DB Graham Version 1.1"
     description: str = "Remade version of Default AstraDB component that supports searching metadata as an input."
     documentation: str = "https://docs.datastax.com/en/langflow/astra-components.html"
     name = "AstraDB"
@@ -161,6 +161,12 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
             dialog_inputs=asdict(NewDatabaseInput()),
             combobox=True,
         ),
+        NestedDictInput(
+            name="additional_metadata",
+            display_name="Additional Metadata",
+            info="Custom metadata to add to each document.",
+            advanced=True,
+        ),
         StrInput(
             name="api_endpoint",
             display_name="Astra DB API Endpoint",
@@ -253,7 +259,6 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
             name="advanced_search_filter",
             display_name="Search Metadata Filter",
             info="Optional dictionary of filters to apply to the search query.",
-            input_types=["dict"],
             advanced=True,
         ),
         BoolInput(
@@ -1162,10 +1167,12 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
         documents = []
         for _input in self.ingest_data or []:
             if isinstance(_input, Data):
-                documents.append(_input.to_lc_document())
+                doc = _input.to_lc_document()
+                doc.metadata = {**(doc.metadata or {}), **(self.additional_metadata or {})}
+                documents.append(doc)
             else:
-                msg = "Vector Store Inputs must be Data objects."
-                raise TypeError(msg)
+                raise TypeError("Vector Store Inputs must be Data objects.")
+        
 
         documents = [
             Document(page_content=doc.page_content, metadata=serialize(doc.metadata, to_str=True)) for doc in documents
@@ -1240,8 +1247,6 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
 
         try:
             search_args = self._build_search_args()
-            if hasattr(self, "advanced_search_filter") and isinstance(self.advanced_search_filter, dict):
-                search_args["filter"] = self.advanced_search_filter
         except Exception as e:
             msg = f"Error in AstraDBVectorStore._build_search_args: {e}"
             raise ValueError(msg) from e
