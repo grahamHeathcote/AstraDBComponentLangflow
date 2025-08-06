@@ -21,7 +21,7 @@ from langflow.io import (
     QueryInput,
     SecretStrInput,
     StrInput,
-    DataInput
+    DataInput,
 )
 from langflow.schema.data import Data
 from langflow.serialization import serialize
@@ -1168,15 +1168,13 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
         for _input in self.ingest_data or []:
             if isinstance(_input, Data):
                 doc = _input.to_lc_document()
-                doc.metadata = {
-                    **(doc.metadata or {}),
-                    **(self.metadata_in.data if self.metadata_in and hasattr(self.metadata_in, "data") else {}),
-                    **(self.additional_metadata or {})
-                }
+                incoming = getattr(self.metadata_to_add, "data", {}) or {}
+                doc.metadata = {**(doc.metadata or {}), **incoming}
+
                 documents.append(doc)
             else:
-                raise TypeError("Vector Store Inputs must be Data objects.")
-        
+                msg = "Vector Store Inputs must be Data objects."
+                raise TypeError(msg)
 
         documents = [
             Document(page_content=doc.page_content, metadata=serialize(doc.metadata, to_str=True)) for doc in documents
