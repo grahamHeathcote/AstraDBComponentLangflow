@@ -164,7 +164,7 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
         ),
         DataInput(
             name="metadata_to_add",
-            display_name="Metadata To Add",
+            display_name="Metadata To Add to Vectors",
             required=True
         ),
         StrInput(
@@ -1161,16 +1161,33 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
 
         return vector_store
 
+    def to_lc_document_with_metadata(self, data_obj: Data, extract_metadata=None) -> Document:
+        data_copy = (data_obj.data or {}).copy()
+        if isinstance(extract_metadata, str):
+            try:
+                import json
+                extra = json.loads(extract_metadata)
+            except Exception:
+                extra = {"value": extract_metadata}
+        elif isinstance(extract_metadata, dict):
+            extra = extract_metadata
+        elif extract_metadata is None:
+            extra = {}
+        else:
+            extra = {"value": str(extract_metadata)}
+        data_copy.update(extra)
+        text = data_copy.pop(data_obj.text_key, data_obj.default_value)
+        if isinstance(text, str):
+            return Document(page_content=text, metadata=data_copy)
+        return Document(page_content=str(text), metadata=data_copy)
+
     def _add_documents_to_vector_store(self, vector_store) -> None:
         self.ingest_data = self._prepare_ingest_data()
 
         documents = []
         for _input in self.ingest_data or []:
             if isinstance(_input, Data):
-                doc = _input.to_lc_document()
-                incoming = getattr(self.metadata_to_add, "data", {}) or {}
-                doc.metadata = {**(doc.metadata or {}), **incoming}
-
+                doc = self.to_lc_document_with_metadata(_input, extract_metadata=getattr(self.metadata_to_add, "data", {}))
                 documents.append(doc)
             else:
                 msg = "Vector Store Inputs must be Data objects."
