@@ -1,4 +1,5 @@
 import re
+import json
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 
@@ -167,6 +168,11 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
             display_name="Metadata To Add to Vectors",
             required=True
         ),
+        DataInput(
+            name="advanced_search_filter",
+            display_name="Metadata To Query Vectors By",
+            required=True,
+        ),
         StrInput(
             name="api_endpoint",
             display_name="Astra DB API Endpoint",
@@ -253,12 +259,6 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
             info="Minimum similarity score threshold for search results. "
             "(when using 'Similarity with score threshold')",
             value=0,
-            advanced=True,
-        ),
-        NestedDictInput(
-            name="advanced_search_filter",
-            display_name="Search Metadata Filter",
-            info="Optional dictionary of filters to apply to the search query.",
             advanced=True,
         ),
         BoolInput(
@@ -1227,12 +1227,23 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
 
         return search_type_mapping.get(self.search_type, "similarity")
 
+    def to_plain_dict(self, val):
+        if isinstance(val, Data):
+            val = val.data
+        if hasattr(val, "to_dict"):
+            val = val.to_dict()
+        if isinstance(val, str):
+            try:
+                val = json.loads(val)
+            except Exception:
+                val = {}
+        return val or {}
+
     def _build_search_args(self):
-        # Clean up the search query
         query = self.search_query if isinstance(self.search_query, str) and self.search_query.strip() else None
         lexical_terms = self.lexical_terms or None
+        filter_arg = self.to_plain_dict(self.advanced_search_filter)
 
-        # Check if we have a search query, and if so set the args
         if query:
             args = {
                 "query": query,
@@ -1241,14 +1252,11 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
                 "score_threshold": self.search_score_threshold,
                 "lexical_query": lexical_terms,
             }
-        elif self.advanced_search_filter:
-            args = {
-                "n": self.number_of_results,
-            }
+        elif filter_arg:
+            args = {"n": self.number_of_results}
         else:
             return {}
 
-        filter_arg = self.advanced_search_filter or {}
         if filter_arg:
             args["filter"] = filter_arg
 
