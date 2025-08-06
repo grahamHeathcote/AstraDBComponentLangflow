@@ -31,8 +31,8 @@ from langflow.utils.version import get_version_info
 
 @vector_store_connection
 class AstraDBVectorStoreComponent(LCVectorStoreComponent):
-    display_name: str = "Astra DB"
-    description: str = "Ingest and search documents in Astra DB"
+    display_name: str = "Astra DB Graham Version 2.0"
+    description: str = "Supports adding and searching by metadata fields."
     documentation: str = "https://docs.datastax.com/en/langflow/astra-components.html"
     name = "AstraDB"
     icon: str = "AstraDB"
