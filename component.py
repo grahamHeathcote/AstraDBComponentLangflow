@@ -21,6 +21,7 @@ from langflow.io import (
     QueryInput,
     SecretStrInput,
     StrInput,
+    DataInput
 )
 from langflow.schema.data import Data
 from langflow.serialization import serialize
@@ -29,8 +30,8 @@ from langflow.utils.version import get_version_info
 
 @vector_store_connection
 class AstraDBVectorStoreComponent(LCVectorStoreComponent):
-    display_name: str = "Astra DB Graham Version 1.1"
-    description: str = "Remade version of Default AstraDB component that supports searching metadata as an input."
+    display_name: str = "Astra DB"
+    description: str = "Ingest and search documents in Astra DB"
     documentation: str = "https://docs.datastax.com/en/langflow/astra-components.html"
     name = "AstraDB"
     icon: str = "AstraDB"
@@ -161,11 +162,10 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
             dialog_inputs=asdict(NewDatabaseInput()),
             combobox=True,
         ),
-        NestedDictInput(
-            name="additional_metadata",
-            display_name="Additional Metadata",
-            info="Custom metadata to add to each document.",
-            advanced=True,
+        DataInput(
+            name="metadata_to_add",
+            display_name="Metadata To Add",
+            required=True
         ),
         StrInput(
             name="api_endpoint",
@@ -1168,7 +1168,11 @@ class AstraDBVectorStoreComponent(LCVectorStoreComponent):
         for _input in self.ingest_data or []:
             if isinstance(_input, Data):
                 doc = _input.to_lc_document()
-                doc.metadata = {**(doc.metadata or {}), **(self.additional_metadata or {})}
+                doc.metadata = {
+                    **(doc.metadata or {}),
+                    **(self.metadata_in.data if self.metadata_in and hasattr(self.metadata_in, "data") else {}),
+                    **(self.additional_metadata or {})
+                }
                 documents.append(doc)
             else:
                 raise TypeError("Vector Store Inputs must be Data objects.")
